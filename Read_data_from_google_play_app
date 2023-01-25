@@ -1,0 +1,47 @@
+from google_play_scraper import app, Sort, reviews_all
+from app_store_scraper import AppStore
+import pandas as pd
+import numpy as np
+import json, os, uuid
+
+#passing the google app package name
+gplay_reviews = reviews_all(
+        "ae.sharjah.ds",
+        sleep_milliseconds=0, # defaults to 0
+        lang='en', # defaults to 'en'
+        country='us', # defaults to 'us'
+        sort=Sort.NEWEST, # defaults to Sort.MOST_RELEVANT
+    )
+#Passing the App package name and ID    
+appstore_reviews = AppStore('us', 'digital-sharjah', '1569055813')
+appstore_reviews.review()
+
+#Google app info
+gplay_df = pd.DataFrame(np.array(gplay_reviews),columns=['review'])
+gplay_df2 = gplay_df.join(pd.DataFrame(gplay_df.pop('review').tolist()))
+
+gplay_df2.drop(columns={'userImage', 'reviewCreatedVersion'},inplace = True)
+gplay_df2.rename(columns= {'score': 'rating','userName': 'user_name', 'reviewId': 'review_id', 'content': 'review_description', 'at': 'review_date', 'replyContent': 'developer_response', 'repliedAt': 'developer_response_date', 'thumbsUpCount': 'thumbs_up'},inplace = True)
+gplay_df2.insert(loc=0, column='source', value='Google Play')
+gplay_df2.insert(loc=3, column='review_title', value=None)
+gplay_df2['laguage_code'] = 'en'
+gplay_df2['country_code'] = 'us'
+
+#Apple App information
+appstore_df = pd.DataFrame(np.array(appstore_reviews.reviews),columns=['review'])
+appstore_df2 = appstore_df.join(pd.DataFrame(appstore_df.pop('review').tolist()))
+
+#removing the unwated columns
+appstore_df2.drop(columns={'isEdited'},inplace = True)
+appstore_df2.insert(loc=0, column='source', value='App Store')
+appstore_df2['developer_response_date'] = None
+appstore_df2['thumbs_up'] = None
+appstore_df2['laguage_code'] = 'en'
+appstore_df2['country_code'] = 'us'
+appstore_df2.insert(loc=1, column='review_id', value=[uuid.uuid4() for _ in range(len(appstore_df2.index))])
+appstore_df2.rename(columns= {'review': 'review_description','userName': 'user_name', 'date': 'review_date','title': 'review_title', 'developerResponse': 'developer_response'},inplace = True)
+appstore_df2 = appstore_df2.where(pd.notnull(appstore_df2), None)
+
+#combining the result
+result = pd.concat([gplay_df2,appstore_df2])
+result
